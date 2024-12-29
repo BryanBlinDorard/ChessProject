@@ -529,9 +529,32 @@ class Move():
             return self.moveID == other.moveID
         return False
 
-    def getChessNotation(self):
-        return self.getRankFile(self.start_row, self.start_col) + self.getRankFile(self.end_row, self.end_col)
-
     def getRankFile(self, r, c):
         return self.colsToFiles[c] + self.rowsToRanks[r]
+
+    def getChessNotation(self):
+        output_string = ""
+        if self.is_pawn_promotion:
+            output_string += self.getRankFile(self.end_row, self.end_col) + "Q"
+        if self.is_castle_move:
+            if self.end_col == 1:
+                output_string += "0-0-0"
+            else:
+                output_string += "0-0"
+        if self.is_enpassant_move:
+            output_string += self.getRankFile(self.start_row, self.start_col)[0] + "x" + self.getRankFile(self.end_row, self.end_col) + " e.p."
+        if self.piece_captured != "--":
+            if self.piece_moved[1] == "p":
+                output_string += self.getRankFile(self.start_row, self.start_col)[0] + "x" + self.getRankFile(self.end_row, self.end_col)
+            else:
+                output_string += self.piece_moved[1] + "x" + self.getRankFile(self.end_row, self.end_col)
+        else:
+            if self.piece_moved[1] == "p":
+                output_string += self.getRankFile(self.end_row, self.end_col)
+            else:
+                output_string += self.piece_moved[1] + self.getRankFile(self.end_row, self.end_col)
+
+        return output_string
+
+
 
