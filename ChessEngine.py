@@ -23,8 +23,8 @@ class GameState():
         self.move_log = []
         self.white_king_location = (7, 4)
         self.black_king_location = (0, 4)
-        self.check_mate = False
-        self.stale_mate = False
+        self.checkmate = False
+        self.stalemate = False
         self.in_check = False
         self.pins = []
         self.checks = []
@@ -194,12 +194,12 @@ class GameState():
 
         if len(moves) == 0: # Vérifie si le joueur est en échec et mat ou en pat
             if self.in_check:
-                self.check_mate = True
+                self.checkmate = True
             else:
-                self.stale_mate = True
+                self.stalemate = True
         else:
-            self.check_mate = False
-            self.stale_mate = False
+            self.checkmate = False
+            self.stalemate = False
 
         self.current_castling_rights
         return moves
@@ -555,6 +555,3 @@ class Move():
                 output_string += self.piece_moved[1] + self.getRankFile(self.end_row, self.end_col)
 
         return output_string
-
-
-

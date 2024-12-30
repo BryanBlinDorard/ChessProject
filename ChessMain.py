@@ -1,12 +1,16 @@
 """
 Fichier Pricipal, gérera les entrées et sorties du jeu
 """
-from wsgiref.validate import validator
 
+# Importer les bibliothèques nécessaires
 import pygame as p
-import ChessEngine
 import sys
 
+# Importer mes modules
+import ChessEngine
+import ChessAI
+
+# Constantes
 WIDTH = HEIGHT = 512
 DIMENSION = 8
 SQ_SIZE = HEIGHT // DIMENSION
@@ -49,7 +53,11 @@ def main():
 
     turn = 1
 
+    player_one = True  # Si un humain joue les blancs, alors ceci sera True, sinon False
+    player_two = False  # Si un humain joue les noirs, alors ceci sera True, sinon False
+
     while running:
+        human_turn = (game_state.white_to_move and player_one) or (not game_state.white_to_move and player_two)
         for e in p.event.get():
             if e.type == p.QUIT:
                 running = False
@@ -57,7 +65,7 @@ def main():
                 sys.exit()
             # Gestion des événements de la souris
             elif e.type == p.MOUSEBUTTONDOWN:
-                if not game_over:
+                if not game_over and human_turn:
                     location = p.mouse.get_pos()  # (x, y) Localisation de la souris
                     col = location[0] // SQ_SIZE
                     row = location[1] // SQ_SIZE
@@ -72,38 +80,28 @@ def main():
                         for i in range(len(valid_moves)):
                             if move == valid_moves[i]:
                                 game_state.makeMove(valid_moves[i])
-                                if game_state.checkForPinsAndChecks()[0]:
-                                    if not game_state.white_to_move:
-                                        white_did_check = "+"
-                                    else:
-                                        black_did_check = "+"
                                 move_made = True
                                 animate = True
                                 square_selected = () # réinitialiser les clics
                                 player_clicks = []
-                                if game_state.white_to_move:
-                                    moves_list.append(
-                                        f"\n{turn}. {game_state.move_log[-2].getChessNotation()}{white_did_check} {game_state.move_log[-1].getChessNotation()}{black_did_check}")
-                                    print(
-                                        f"\n{turn}. {game_state.move_log[-2].getChessNotation()}{white_did_check} {game_state.move_log[-1].getChessNotation()}{black_did_check}",
-                                        end="")
-                                    turn += 1
-                                    white_did_check = ""
-                                    black_did_check = ""
                         if not move_made:
                             player_clicks = [square_selected]
             # Gestion des événements du clavier
             elif e.type == p.KEYDOWN:
-                if e.key == p.K_z: # annuler le dernier mouvement lorsque 'z' est pressé
-                    if game_state.white_to_move:
-                        if turn > 1:
-                            turn -= 1
-                    game_state.undoMove()
+                if e.key == p.K_z:  # Annuler le dernier coup si possible
+                    # Annuler les deux derniers coups si possible
+                    if len(game_state.move_log) > 0:
+                        game_state.undoMove()  # Annuler le coup du noir
+                        turn -= 1
+                    if len(game_state.move_log) > 0:
+                        game_state.undoMove()  # Annuler ton coup
+                        turn -= 1
                     move_made = True
                     animate = False
                     game_over = False
                     last_move_printed = False
-                if e.key == p.K_r: # réinitialiser le jeu lorsque 'r' est pressé
+
+                if e.key == p.K_r:  # Réinitialiser le jeu
                     game_state = ChessEngine.GameState()
                     valid_moves = game_state.getValidMoves()
                     square_selected = ()
@@ -114,8 +112,36 @@ def main():
                     turn = 1
                     last_move_printed = False
                     moves_list = []
+                    print("Reset de la partie")
+
+        # AI move
+        if not game_over and not human_turn:
+            # AI_move = ChessAI.findRandomMove(valid_moves)
+            # AI_move = ChessAI.findBestMove(game_state, valid_moves)
+            AI_move = ChessAI.findBestMoveMinMax(game_state, valid_moves)
+            if AI_move is None:
+                AI_move = ChessAI.findRandomMove(valid_moves)
+            game_state.makeMove(AI_move)
+            move_made = True
+            animate = True
 
         if move_made:
+            if game_state.checkForPinsAndChecks()[0]:
+                if not game_state.white_to_move:
+                    white_did_check = "+"
+                else:
+                    black_did_check = "+"
+            if game_state.white_to_move:
+                if len(game_state.move_log) >= 2:
+                    moves_list.append(
+                        f"\n{turn}. {game_state.move_log[-2].getChessNotation()}{white_did_check} {game_state.move_log[-1].getChessNotation()}{black_did_check}")
+                    print(
+                        f"\n{turn}. {game_state.move_log[-2].getChessNotation()}{white_did_check} {game_state.move_log[-1].getChessNotation()}{black_did_check}",
+                        end="")
+                    turn += 1
+                    white_did_check = ""
+                    black_did_check = ""
+
             if animate:
                 animateMove(game_state.move_log[-1], screen, game_state.board, clock)
             valid_moves = game_state.getValidMoves()
@@ -124,7 +150,7 @@ def main():
 
         drawGameState(screen, game_state, valid_moves, square_selected)
 
-        if game_state.check_mate:
+        if game_state.checkmate:
             game_over = True
             if game_state.white_to_move:
                 drawText(screen, "Black wins by checkmate")
@@ -144,11 +170,11 @@ def main():
                     print("result: 1-0")
                     last_move_printed = True
                     saveGame(moves_list)
-        elif game_state.stale_mate:
+        elif game_state.stalemate:
             game_over = True
             drawText(screen, "Stalemate")
             if not last_move_printed:
-                if not game_state.white_to_move():
+                if not game_state.white_to_move:
                     moves_list.append(f"\n{turn}. {game_state.move_log[-1].getChessNotation()}")
                     moves_list.append("result: 1/2-1/2")
                     print(f"\n{turn}. {game_state.move_log[-1].getChessNotation()}")
