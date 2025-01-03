@@ -6,7 +6,6 @@ Fichier Pricipal, gérera les entrées et sorties du jeu
 import pygame as p
 import sys
 import os
-from itertools import zip_longest
 from multiprocessing import Process, Queue
 
 # Importer mes modules
@@ -38,6 +37,7 @@ def main():
     '''
     La fonction principale pour gérer les entrées et sorties du jeu
     '''
+    global return_queue
     p.init()
     screen = p.display.set_mode((BOARD_WIDTH + MOVE_LOG_PANEL_WIDTH, BOARD_HEIGHT))
     clock = p.time.Clock()
@@ -57,13 +57,7 @@ def main():
     move_undone = False
     move_finder_process = None
 
-    white_did_check = ""
-    black_did_check = ""
-    last_move_printed = False
-    moves_list = []
     move_log_font = p.font.SysFont("Arial", 14, False, False)
-
-    turn = 1
 
     player_one = False  # Si un humain joue les blancs, alors ceci sera True, sinon False
     player_two = False  # Si un humain joue les noirs, alors ceci sera True, sinon False
@@ -105,14 +99,11 @@ def main():
                     # Annuler les deux derniers coups si possible
                     if len(game_state.move_log) > 0:
                         game_state.undoMove()  # Annuler le coup du noir
-                        turn -= 1
                     if len(game_state.move_log) > 0:
                         game_state.undoMove()  # Annuler ton coup
-                        turn -= 1
                     move_made = True
                     animate = False
                     game_over = False
-                    last_move_printed = False
 
                     if ai_thinking:
                         move_finder_process.terminate()
@@ -127,9 +118,7 @@ def main():
                     move_made = False
                     animate = False
                     game_over = False
-                    turn = 1
-                    last_move_printed = False
-                    moves_list = []
+
                     if ai_thinking:
                         move_finder_process.terminate()
                         ai_thinking = False
@@ -140,7 +129,7 @@ def main():
         if not game_over and not human_turn and not move_undone:
             if not ai_thinking:
                 ai_thinking = True
-                return_queue = Queue()  # used to pass data between threads
+                return_queue = Queue()  # Utiliser pour passer des données entre les threads
                 move_finder_process = Process(target=ChessAI.findBestMove, args=(game_state, valid_moves, return_queue))
                 move_finder_process.start()
             if not move_finder_process.is_alive():
@@ -153,24 +142,6 @@ def main():
                 ai_thinking = False
 
         if move_made:
-            if game_state.checkForPinsAndChecks()[0]:
-                if not game_state.white_to_move:
-                    white_did_check = "+"
-                else:
-                    black_did_check = "+"
-            if game_state.white_to_move:
-                try:
-                    moves_list.append(
-                        f"\n{turn}. {game_state.move_log[-2].getChessNotation()}{white_did_check} {game_state.move_log[-1].getChessNotation()}{black_did_check}")
-                    print(
-                        f"\n{turn}. {game_state.move_log[-2].getChessNotation()}{white_did_check} {game_state.move_log[-1].getChessNotation()}{black_did_check}",
-                        end="")
-                    turn += 1
-                    white_did_check = ""
-                    black_did_check = ""
-                except:
-                    pass
-
             if animate:
                 animateMove(game_state.move_log[-1], screen, game_state.board, clock)
             valid_moves = game_state.getValidMoves()
@@ -187,34 +158,11 @@ def main():
             game_over = True
             if game_state.white_to_move:
                 drawEndGameText(screen, "Noir gagne par échec et mat")
-                if not last_move_printed:
-                    moves_list[-1] += "+"
-                    moves_list.append("result: 0-1")
-                    print("+")
-                    print("result: 0-1")
-                    last_move_printed = True
-                    saveGame(moves_list)
             else:
                 drawEndGameText(screen, "Blanc gagne par échec et mat")
-                if not last_move_printed:
-                    moves_list.append(f"\n{turn}. {game_state.move_log[-1].getChessNotation()}++")
-                    moves_list.append("result: 1-0")
-                    print(f"\n{turn}. {game_state.move_log[-1].getChessNotation()}++")
-                    print("result: 1-0")
-                    last_move_printed = True
-                    saveGame(moves_list)
         elif game_state.stalemate:
             game_over = True
             drawEndGameText(screen, "Impasse")
-            if not last_move_printed:
-                if not game_state.white_to_move:
-                    moves_list.append(f"\n{turn}. {game_state.move_log[-1].getChessNotation()}")
-                    moves_list.append("result: 1/2-1/2")
-                    print(f"\n{turn}. {game_state.move_log[-1].getChessNotation()}")
-                    print("result: 1/2-1/2")
-                    last_move_printed = True
-                    saveGame(moves_list)
-
         clock.tick(MAX_FPS)
         p.display.flip()
 
@@ -227,7 +175,6 @@ def drawGameState(screen, game_state, valid_moves, square_selected, move_log_fon
     highlightSquares(screen, game_state, valid_moves,
                      square_selected)  # Met en évidence les carrés sélectionnés et les mouvements
     drawPieces(screen, game_state.board)  # dessine les pièces sur les carrés
-    # drawMoveLog(screen, game_state, move_log_font) # dessine le journal des mouvements
 
 
 def drawBoard(screen):
@@ -336,23 +283,6 @@ def drawMoveLog(screen, game_state, font):
         text_location = move_log_rect.move(padding, text_y)
         screen.blit(text_object, text_location)
         text_y += text_object.get_height() + line_spacing
-
-
-def saveGame(moves_list):
-    result = moves_list.pop()
-    turns_dict = {}
-    for i in range(len(moves_list) - 1, -1, -1):
-        try:
-            int(moves_list[i][1])
-            if moves_list[i][1] not in turns_dict:
-                turns_dict[moves_list[i][1]] = moves_list[i][1:] + "\n"
-        except:
-            pass
-    file = open("last_game_logs.txt", "w")
-    for turn in sorted(turns_dict.keys()):
-        file.write(turns_dict[turn])
-    file.write(result)
-    file.close()
 
 
 def drawEndGameText(screen, text):
