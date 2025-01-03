@@ -50,7 +50,10 @@ class GameState():
         # Promotion du pion
         if move.is_pawn_promotion:
             promoted_piece = input("Promote to Q, R, B, or N:")  # take this to UI later
+            while promoted_piece not in ['Q', 'R', 'B', 'N']:
+                promoted_piece = input("Invalid Input. Promote to Q, R, B, or N:")
             self.board[move.end_row][move.end_col] = move.piece_moved[0] + promoted_piece
+
 
         # En passant
         if move.is_enpassant_move:

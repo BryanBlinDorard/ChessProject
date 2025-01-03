@@ -54,7 +54,7 @@ def main():
     turn = 1
 
     player_one = True  # Si un humain joue les blancs, alors ceci sera True, sinon False
-    player_two = False  # Si un humain joue les noirs, alors ceci sera True, sinon False
+    player_two = True  # Si un humain joue les noirs, alors ceci sera True, sinon False
 
     while running:
         human_turn = (game_state.white_to_move and player_one) or (not game_state.white_to_move and player_two)
@@ -119,7 +119,8 @@ def main():
             # AI_move = ChessAI.findRandomMove(valid_moves)
             # AI_move = ChessAI.findBestMove(game_state, valid_moves)
             # AI_move = ChessAI.findBestMoveMinMax(game_state, valid_moves)
-            AI_move = ChessAI.findBestMoveNegaMax(game_state, valid_moves)
+            # AI_move = ChessAI.findBestMoveNegaMax(game_state, valid_moves)
+            AI_move = ChessAI.findBestMoveNegaMaxAlphaBeta(game_state, valid_moves)
             if AI_move is None:
                 AI_move = ChessAI.findRandomMove(valid_moves)
             game_state.makeMove(AI_move)

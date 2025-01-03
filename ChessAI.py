@@ -14,6 +14,7 @@ def findRandomMove(valid_moves):
 def findBestMove(game_state, valid_moves):
     '''
         Trouve le meilleur mouvement en utilisant Minimax avec Alpha-Beta Pruning
+        Simule tous les mouvements possibles et choisit le meilleur
     '''
     turn_multiplier = 1 if game_state.white_to_move else -1
     opponent_min_max_score = CHECKMATE
@@ -49,6 +50,7 @@ def findBestMove(game_state, valid_moves):
 def findBestMoveMinMax(game_state, valid_moves):
     '''
     Méthode d'aide pour faire le premier appel récursif
+    (Interface pour appeler la méthode récursive findMoveMinMax)
     '''
     global next_move
     next_move = None
@@ -57,6 +59,10 @@ def findBestMoveMinMax(game_state, valid_moves):
     return next_move
 
 def findMoveMinMax(game_state, valid_moves, depth, white_to_move):
+    """
+    Trouve le meilleur mouvement en utilisant Minimax
+    (Exploration complète de l'arbre de jeu)
+    """
     global next_move
     if depth == 0:
         return scoreBoard(game_state)
@@ -88,6 +94,7 @@ def findMoveMinMax(game_state, valid_moves, depth, white_to_move):
 def findBestMoveNegaMax(game_state, valid_moves):
     """
     Trouve le meilleur mouvement en utilisant NegaMax
+    (Similaire à Minimax mais avec une implémentation plus simple)
     """
     global next_move
     next_move = None
@@ -111,6 +118,42 @@ def findMoveNegaMax(game_state, valid_moves, depth, turn_multiplier):
             if depth == DEPTH:
                 next_move = move
         game_state.undoMove()
+    return max_score
+
+
+def findBestMoveNegaMaxAlphaBeta(game_state, valid_moves):
+    """
+    Trouve le meilleur mouvement en utilisant NegaMax avec Alpha-Beta Pruning
+    (Similaire à NegaMax mais avec une meilleure efficacité(plus de précision))
+    """
+    global next_move
+    next_move = None
+    random.shuffle(valid_moves)
+    findMoveNegaMaxAlphaBeta(game_state, valid_moves, DEPTH, -CHECKMATE, CHECKMATE,
+                             1 if game_state.white_to_move else -1)
+    return next_move
+
+
+def findMoveNegaMaxAlphaBeta(game_state, valid_moves, depth, alpha, beta, turn_multiplier):
+    global next_move
+    if depth == 0:
+        return turn_multiplier * scoreBoard(game_state)
+
+    # Tri des mouvements pour améliorer l'efficacité de l'élagage alpha-beta
+    max_score = -CHECKMATE
+    for move in valid_moves:
+        game_state.makeMove(move)
+        next_moves = game_state.getValidMoves()
+        score = -findMoveNegaMaxAlphaBeta(game_state, next_moves, depth - 1, -beta, -alpha, -turn_multiplier)
+        if score > max_score:
+            max_score = score
+            if depth == DEPTH:
+                next_move = move
+        game_state.undoMove()
+        if max_score > alpha:
+            alpha = max_score
+        if alpha >= beta:
+            break
     return max_score
 
 def scoreBoard(game_state):
