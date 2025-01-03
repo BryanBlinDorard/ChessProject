@@ -5,11 +5,13 @@ CHECKMATE = 1000
 STALEMATE = 0
 DEPTH = 3
 
+
 def findRandomMove(valid_moves):
     '''
         Choisit un mouvement aléatoire parmi les mouvements valides
     '''
     return random.choice(valid_moves)
+
 
 def findBestMove(game_state, valid_moves):
     '''
@@ -47,6 +49,7 @@ def findBestMove(game_state, valid_moves):
         game_state.undoMove()
     return best_player_move
 
+
 def findBestMoveMinMax(game_state, valid_moves):
     '''
     Méthode d'aide pour faire le premier appel récursif
@@ -57,6 +60,7 @@ def findBestMoveMinMax(game_state, valid_moves):
     random.shuffle(valid_moves)
     findMoveMinMax(game_state, valid_moves, DEPTH, game_state.white_to_move)
     return next_move
+
 
 def findMoveMinMax(game_state, valid_moves, depth, white_to_move):
     """
@@ -90,6 +94,7 @@ def findMoveMinMax(game_state, valid_moves, depth, white_to_move):
                     next_move = move
             game_state.undoMove()
         return min_score
+
 
 def findBestMoveNegaMax(game_state, valid_moves):
     """
@@ -156,15 +161,16 @@ def findMoveNegaMaxAlphaBeta(game_state, valid_moves, depth, alpha, beta, turn_m
             break
     return max_score
 
+
 def scoreBoard(game_state):
     '''
     Score du plateau. Un score positif est bon pour les blancs, un score négatif est bon pour les noirs.
     '''
     if game_state.checkmate:
         if game_state.white_to_move:
-            return -CHECKMATE # Noirs gagnent
+            return -CHECKMATE  # Noirs gagnent
         else:
-            return CHECKMATE # Blancs gagnent
+            return CHECKMATE  # Blancs gagnent
     elif game_state.stalemate:
         return STALEMATE
     score = 0
@@ -175,6 +181,7 @@ def scoreBoard(game_state):
             elif square[0] == 'b':
                 score -= piece_score[square[1]]
     return score
+
 
 def scoreMaterial(board):
     '''

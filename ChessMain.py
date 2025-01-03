@@ -12,7 +12,7 @@ import ChessEngine
 import ChessAI
 
 # Constantes
-BOARD_WIDTH  = BOARD_HEIGHT = 512
+BOARD_WIDTH = BOARD_HEIGHT = 512
 MOVE_LOG_PANEL_WIDTH = 250
 MOVE_LOG_PANEL_HEIGHT = BOARD_HEIGHT
 DIMENSION = 8
@@ -57,7 +57,7 @@ def main():
 
     turn = 1
 
-    player_one = False  # Si un humain joue les blancs, alors ceci sera True, sinon False
+    player_one = True  # Si un humain joue les blancs, alors ceci sera True, sinon False
     player_two = False  # Si un humain joue les noirs, alors ceci sera True, sinon False
 
     while running:
@@ -73,20 +73,21 @@ def main():
                     location = p.mouse.get_pos()  # (x, y) Localisation de la souris
                     col = location[0] // SQ_SIZE
                     row = location[1] // SQ_SIZE
-                    if square_selected == (row, col) or col >= 8: # L'utilisateur a cliqué sur la même case deux fois ou en dehors du tableau
-                        square_selected = () # annuler le clic
-                        player_clicks = [] # annuler les clics
+                    if square_selected == (
+                    row, col) or col >= 8:  # L'utilisateur a cliqué sur la même case deux fois ou en dehors du tableau
+                        square_selected = ()  # annuler le clic
+                        player_clicks = []  # annuler les clics
                     else:
                         square_selected = (row, col)
-                        player_clicks.append(square_selected) # ajouter à la liste
-                    if len(player_clicks) == 2: # après le deuxième clic
+                        player_clicks.append(square_selected)  # ajouter à la liste
+                    if len(player_clicks) == 2:  # après le deuxième clic
                         move = ChessEngine.Move(player_clicks[0], player_clicks[1], game_state.board)
                         for i in range(len(valid_moves)):
                             if move == valid_moves[i]:
                                 game_state.makeMove(valid_moves[i])
                                 move_made = True
                                 animate = True
-                                square_selected = () # réinitialiser les clics
+                                square_selected = ()  # réinitialiser les clics
                                 player_clicks = []
                         if not move_made:
                             player_clicks = [square_selected]
@@ -197,14 +198,14 @@ def main():
         p.display.flip()
 
 
-
 def drawGameState(screen, game_state, valid_moves, square_selected, move_log_font):
     """
     Gère tous les graphiques du jeu
     """
-    drawBoard(screen) # dessine les carrés sur le tableau
-    highlightSquares(screen, game_state, valid_moves, square_selected) # Met en évidence les carrés sélectionnés et les mouvements
-    drawPieces(screen, game_state.board) # dessine les pièces sur les carrés
+    drawBoard(screen)  # dessine les carrés sur le tableau
+    highlightSquares(screen, game_state, valid_moves,
+                     square_selected)  # Met en évidence les carrés sélectionnés et les mouvements
+    drawPieces(screen, game_state.board)  # dessine les pièces sur les carrés
     # drawMoveLog(screen, game_state, move_log_font) # dessine le journal des mouvements
 
 
@@ -217,9 +218,8 @@ def drawBoard(screen):
     colors = [p.Color("white"), p.Color("gray")]
     for row in range(DIMENSION):
         for column in range(DIMENSION):
-            color = colors[((row+column) % 2)]
-            p.draw.rect(screen, color, p.Rect(column*SQ_SIZE, row*SQ_SIZE, SQ_SIZE, SQ_SIZE))
-
+            color = colors[((row + column) % 2)]
+            p.draw.rect(screen, color, p.Rect(column * SQ_SIZE, row * SQ_SIZE, SQ_SIZE, SQ_SIZE))
 
 
 def highlightSquares(screen, game_state, valid_moves, square_selected):
@@ -231,20 +231,22 @@ def highlightSquares(screen, game_state, valid_moves, square_selected):
         s = p.Surface((SQ_SIZE, SQ_SIZE))
         s.set_alpha(100)
         s.fill(p.Color('green'))
-        screen.blit(s, (last_move.end_col*SQ_SIZE, last_move.end_row*SQ_SIZE))
+        screen.blit(s, (last_move.end_col * SQ_SIZE, last_move.end_row * SQ_SIZE))
     if square_selected != ():
         row, col = square_selected
-        if game_state.board[row][col][0] == ('w' if game_state.white_to_move else 'b'): # Mettre en évidence la pièce sélectionnée
+        if game_state.board[row][col][0] == (
+        'w' if game_state.white_to_move else 'b'):  # Mettre en évidence la pièce sélectionnée
             # Carré sélectionné
             s = p.Surface((SQ_SIZE, SQ_SIZE))
-            s.set_alpha(100) #transparence value 0 -> transparent, 255 -> opaque
+            s.set_alpha(100)  # transparence value 0 -> transparent, 255 -> opaque
             s.fill(p.Color('blue'))
-            screen.blit(s, (col*SQ_SIZE, row*SQ_SIZE))
+            screen.blit(s, (col * SQ_SIZE, row * SQ_SIZE))
             # Mettre en évidence les mouvements valides
             s.fill(p.Color('yellow'))
             for move in valid_moves:
                 if move.start_row == row and move.start_col == col:
-                    screen.blit(s, (move.end_col*SQ_SIZE, move.end_row*SQ_SIZE))
+                    screen.blit(s, (move.end_col * SQ_SIZE, move.end_row * SQ_SIZE))
+
 
 def drawPieces(screen, board):
     """
@@ -254,7 +256,7 @@ def drawPieces(screen, board):
         for c in range(DIMENSION):
             piece = board[r][c]
             if piece != "--":
-                screen.blit(IMAGES[piece], p.Rect(c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
+                screen.blit(IMAGES[piece], p.Rect(c * SQ_SIZE, r * SQ_SIZE, SQ_SIZE, SQ_SIZE))
 
 
 def animateMove(move, screen, board, clock):
@@ -264,7 +266,7 @@ def animateMove(move, screen, board, clock):
     global colors
     d_row = move.end_row - move.start_row
     d_col = move.end_col - move.start_col
-    frames_per_square = 10 # frames pour déplacer une case
+    frames_per_square = 10  # frames pour déplacer une case
     frame_count = (abs(d_row) + abs(d_col)) * frames_per_square
     for frame in range(frame_count + 1):
         row, col = (move.start_row + d_row * frame / frame_count, move.start_col + d_col * frame / frame_count)
@@ -272,7 +274,7 @@ def animateMove(move, screen, board, clock):
         drawPieces(screen, board)
         # Supprimer la pièce déplacée de la case de départ
         color = colors[(move.end_row + move.end_col) % 2]
-        end_square = p.Rect(move.end_col*SQ_SIZE, move.end_row*SQ_SIZE, SQ_SIZE, SQ_SIZE)
+        end_square = p.Rect(move.end_col * SQ_SIZE, move.end_row * SQ_SIZE, SQ_SIZE, SQ_SIZE)
         p.draw.rect(screen, color, end_square)
         # Dessiner la pièce capturée dans la case de fin
         if move.piece_captured != '--':
@@ -280,8 +282,8 @@ def animateMove(move, screen, board, clock):
                 enpassant_row = move.end_row + 1 if move.piece_captured[0] == 'b' else move.end_row - 1
                 end_square = p.Rect(move.end_col * SQ_SIZE, enpassant_row * SQ_SIZE, SQ_SIZE, SQ_SIZE)
             screen.blit(IMAGES[move.piece_captured], end_square)
-        #draw moving piece
-        screen.blit(IMAGES[move.piece_moved], p.Rect(col*SQ_SIZE, row*SQ_SIZE, SQ_SIZE, SQ_SIZE))
+        # draw moving piece
+        screen.blit(IMAGES[move.piece_moved], p.Rect(col * SQ_SIZE, row * SQ_SIZE, SQ_SIZE, SQ_SIZE))
         p.display.flip()
         clock.tick(60)
 
