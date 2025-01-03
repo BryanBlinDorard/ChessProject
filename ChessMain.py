@@ -5,11 +5,15 @@ Fichier Pricipal, gérera les entrées et sorties du jeu
 # Importer les bibliothèques nécessaires
 import pygame as p
 import sys
+import os
 from itertools import zip_longest
+from multiprocessing import Process, Queue
 
 # Importer mes modules
-import ChessEngine
-import ChessAI
+import ChessEngine, ChessAI
+
+# Configurations
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 
 # Constantes
 BOARD_WIDTH = BOARD_HEIGHT = 512
@@ -49,6 +53,10 @@ def main():
     player_clicks = []  # gardera les deux dernières cases cliquées par le joueur (liste: [(row1, col1), (row2, col2)])
     game_over = False
 
+    ai_thinking = False
+    move_undone = False
+    move_finder_process = None
+
     white_did_check = ""
     black_did_check = ""
     last_move_printed = False
@@ -69,7 +77,7 @@ def main():
                 sys.exit()
             # Gestion des événements de la souris
             elif e.type == p.MOUSEBUTTONDOWN:
-                if not game_over and human_turn:
+                if not game_over:
                     location = p.mouse.get_pos()  # (x, y) Localisation de la souris
                     col = location[0] // SQ_SIZE
                     row = location[1] // SQ_SIZE
@@ -80,7 +88,7 @@ def main():
                     else:
                         square_selected = (row, col)
                         player_clicks.append(square_selected)  # ajouter à la liste
-                    if len(player_clicks) == 2:  # après le deuxième clic
+                    if len(player_clicks) == 2 and human_turn:  # après le deuxième clic
                         move = ChessEngine.Move(player_clicks[0], player_clicks[1], game_state.board)
                         for i in range(len(valid_moves)):
                             if move == valid_moves[i]:
@@ -106,6 +114,11 @@ def main():
                     game_over = False
                     last_move_printed = False
 
+                    if ai_thinking:
+                        move_finder_process.terminate()
+                        ai_thinking = False
+                    move_undone = True
+
                 if e.key == p.K_r:  # Réinitialiser le jeu
                     game_state = ChessEngine.GameState()
                     valid_moves = game_state.getValidMoves()
@@ -117,20 +130,27 @@ def main():
                     turn = 1
                     last_move_printed = False
                     moves_list = []
+                    if ai_thinking:
+                        move_finder_process.terminate()
+                        ai_thinking = False
+                    move_undone = True
                     print("Reset de la partie")
 
         # AI move
-        if not game_over and not human_turn:
-            # AI_move = ChessAI.findRandomMove(valid_moves)
-            # AI_move = ChessAI.findBestMove(game_state, valid_moves)
-            # AI_move = ChessAI.findBestMoveMinMax(game_state, valid_moves)
-            # AI_move = ChessAI.findBestMoveNegaMax(game_state, valid_moves)
-            AI_move = ChessAI.findBestMoveNegaMaxAlphaBeta(game_state, valid_moves)
-            if AI_move is None:
-                AI_move = ChessAI.findRandomMove(valid_moves)
-            game_state.makeMove(AI_move)
-            move_made = True
-            animate = True
+        if not game_over and not human_turn and not move_undone:
+            if not ai_thinking:
+                ai_thinking = True
+                return_queue = Queue()  # used to pass data between threads
+                move_finder_process = Process(target=ChessAI.findBestMove, args=(game_state, valid_moves, return_queue))
+                move_finder_process.start()
+            if not move_finder_process.is_alive():
+                ai_move = return_queue.get()
+                if ai_move is None:
+                    ai_move = ChessAI.findRandomMove(valid_moves)
+                game_state.makeMove(ai_move)
+                move_made = True
+                animate = True
+                ai_thinking = False
 
         if move_made:
             if game_state.checkForPinsAndChecks()[0]:
@@ -156,6 +176,7 @@ def main():
             valid_moves = game_state.getValidMoves()
             move_made = False
             animate = False
+            move_undone = False
 
         drawGameState(screen, game_state, valid_moves, square_selected, move_log_font)
 

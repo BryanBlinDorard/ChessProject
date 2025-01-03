@@ -58,7 +58,7 @@ STALEMATE = 0
 DEPTH = 3
 
 
-def findBestMoveNegaMaxAlphaBeta(game_state, valid_moves):
+def findBestMove(game_state, valid_moves, return_queue):
     """
     Trouve le meilleur mouvement en utilisant NegaMax avec Alpha-Beta Pruning
     (Similaire à NegaMax mais avec une meilleure efficacité(plus de précision))
@@ -68,7 +68,7 @@ def findBestMoveNegaMaxAlphaBeta(game_state, valid_moves):
     random.shuffle(valid_moves)
     findMoveNegaMaxAlphaBeta(game_state, valid_moves, DEPTH, -CHECKMATE, CHECKMATE,
                              1 if game_state.white_to_move else -1)
-    return next_move
+    return_queue.put(next_move)
 
 
 def findMoveNegaMaxAlphaBeta(game_state, valid_moves, depth, alpha, beta, turn_multiplier):
@@ -106,35 +106,17 @@ def scoreBoard(game_state):
     elif game_state.stalemate:
         return STALEMATE
     score = 0
-    is_endgame = False
-    white_has_queen = False
-    black_has_queen = False
-    white_additional_pieces = 0
-    black_additional_pieces = 0
-    for row in game_state.board:
-        for piece in row:
-            if piece == "wQ":
-                white_has_queen = True
-            if piece == "bQ":
-                black_has_queen = True
-            if piece == "wR" or piece == "wB" or piece == "wN":
-                white_additional_pieces += 1
-            if piece == "bR" or piece == "bB" or piece == "bN":
-                black_additional_pieces += 1
-        if (not white_has_queen and not black_has_queen) or (white_has_queen and white_additional_pieces < 2) or (
-                black_has_queen and black_additional_pieces < 2):
-            is_endgame = True
-        for row in range(len(game_state.board)):
-            for col in range(len(game_state.board[row])):
-                piece = game_state.board[row][col]
-                if piece != "--":
-                    piece_position_score = 0
-                    if piece[1] != "K":
-                        piece_position_score = piece_position_scores[piece][row][col]
-                    if piece[0] == "w":
-                        score += piece_score[piece[1]] + piece_position_score
-                    if piece[0] == "b":
-                        score -= piece_score[piece[1]] + piece_position_score
+    for row in range(len(game_state.board)):
+        for col in range(len(game_state.board[row])):
+            piece = game_state.board[row][col]
+            if piece != "--":
+                piece_position_score = 0
+                if piece[1] != "K":
+                    piece_position_score = piece_position_scores[piece][row][col]
+                if piece[0] == "w":
+                    score += piece_score[piece[1]] + piece_position_score
+                if piece[0] == "b":
+                    score -= piece_score[piece[1]] + piece_position_score
     return score
 
 
