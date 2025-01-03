@@ -28,12 +28,13 @@ class GameState():
         self.in_check = False
         self.pins = []
         self.checks = []
-        self.en_passant_possible = () # Coordonnées pour la case où l'en passant est possible
+        self.enpassant_possible = () # Coordonnées pour la case où l'en passant est possible
+        self.enpassant_possible_log = [self.enpassant_possible]
         self.current_castling_rights = CastleRights(True, True, True, True) # Les droits de roque actuels
         self.castle_rights_log = [CastleRights(self.current_castling_rights.wks, self.current_castling_rights.bks, self.current_castling_rights.wqs, self.current_castling_rights.bqs)]
 
 
-    def makeMove(self, move):
+    def makeMove(self, move, is_AI=False):
         """
             Fait le mouvement donné en paramètre et l'éxécute (ne vérifie pas si le mouvement est valide)
         """
@@ -49,10 +50,12 @@ class GameState():
 
         # Promotion du pion
         if move.is_pawn_promotion:
-            promoted_piece = input("Promote to Q, R, B, or N:")  # take this to UI later
-            while promoted_piece not in ['Q', 'R', 'B', 'N']:
-                promoted_piece = input("Invalid Input. Promote to Q, R, B, or N:")
-            self.board[move.end_row][move.end_col] = move.piece_moved[0] + promoted_piece
+            # if not is_AI:
+            # promoted_piece = input("Promote to Q, R, B, or N:")  # take this to UI later
+            # while promoted_piece not in ['Q', 'R', 'B', 'N']:
+            #     promoted_piece = input("Invalid Input. Promote to Q, R, B, or N:")
+            # self.board[move.end_row][move.end_col] = move.piece_moved[0] + promoted_piece
+            self.board[move.end_row][move.end_col] = move.piece_moved[0] + 'Q'  # Temporaire
 
 
         # En passant
@@ -61,10 +64,11 @@ class GameState():
 
         # Met à jour enPassantPossible
         if move.piece_moved[1] == 'p' and abs(move.start_row - move.end_row) == 2:
-            self.en_passant_possible = ((move.start_row + move.end_row) // 2, move.start_col)
+            self.enpassant_possible = ((move.start_row + move.end_row) // 2, move.start_col)
         else:
-            self.en_passant_possible = ()
+            self.enpassant_possible = ()
 
+        # Roque
         if move.is_castle_move:
             if move.end_col - move.start_col == 2:  #
                 self.board[move.end_row][move.end_col - 1] = self.board[move.end_row][move.end_col + 1]  # Bouge la tour à sa nouvelle case
@@ -72,6 +76,8 @@ class GameState():
             else:
                 self.board[move.end_row][move.end_col + 1] = self.board[move.end_row][move.end_col - 2]  # Bouge la tour à sa nouvelle case
                 self.board[move.end_row][move.end_col - 2] = '--'  # Efface l'ancienne tour
+
+        self.enpassant_possible_log.append(self.enpassant_possible)
 
         # Met à jour les droits de roque - chaque fois qu'il s'agit d'un mouvement de tour ou de roi
         self.updateCastleRights(move)
@@ -98,13 +104,11 @@ class GameState():
             if move.is_enpassant_move:
                 self.board[move.end_row][move.end_col] = "--"
                 self.board[move.start_row][move.end_col] = move.piece_captured
-                self.en_passant_possible = (move.end_row, move.end_col)
-            # Annule le mouvement double du pion
-            if move.piece_moved[1] == 'p' and abs(move.start_row - move.end_row) == 2:
-                self.en_passant_possible = ()
+
+            self.enpassant_possible_log.pop()
+            self.enpassant_possible = self.enpassant_possible_log[-1]
 
             # Annule le droit de roque
-
             self.castle_rights_log.pop() # Obtenir les nouveaux droits de roque du mouvement que nous annulons
             self.current_castling_rights = self.castle_rights_log[-1] # Mettre à jour les droits de roque
             # Annule le roque
@@ -115,6 +119,9 @@ class GameState():
                 else:
                     self.board[move.end_row][move.end_col - 2] = self.board[move.end_row][move.end_col + 1]
                     self.board[move.end_row][move.end_col + 1] = '--'
+
+            self.checkmate = False
+            self.stalemate = False
 
     def updateCastleRights(self, move):
         '''
@@ -272,13 +279,13 @@ class GameState():
             if not piece_pinned or pin_direction == (move_amount, -1):
                 if self.board[row + move_amount][col - 1][0] == enemy_color:
                     moves.append(Move((row, col), (row + move_amount, col - 1), self.board))
-                if (row + move_amount, col - 1) == self.en_passant_possible:
+                if (row + move_amount, col - 1) == self.enpassant_possible:
                     moves.append(Move((row, col), (row + move_amount, col - 1), self.board, is_enpassant_move=True))
         if col + 1 <= 7:  # Capture à droite
             if not piece_pinned or pin_direction == (move_amount, +1):
                 if self.board[row + move_amount][col + 1][0] == enemy_color:
                     moves.append(Move((row, col), (row + move_amount, col + 1), self.board))
-                if (row + move_amount, col + 1) == self.en_passant_possible:
+                if (row + move_amount, col + 1) == self.enpassant_possible:
                     moves.append(Move((row, col), (row + move_amount, col + 1), self.board, is_enpassant_move=True))
 
 
@@ -503,12 +510,12 @@ class CastleRights():
 class Move():
     # Maps keys to values
     # key : value
-    ranksToRows = {"1": 7, "2": 6, "3": 5, "4": 4,
+    ranks_to_rows = {"1": 7, "2": 6, "3": 5, "4": 4,
                    "5": 3, "6": 2, "7": 1, "8": 0}
-    rowsToRanks = {v: k for k, v in ranksToRows.items()}
-    filesToCols = {"a": 0, "b": 1, "c": 2, "d": 3,
+    rows_to_ranks = {v: k for k, v in ranks_to_rows.items()}
+    files_to_cols = {"a": 0, "b": 1, "c": 2, "d": 3,
                    "e": 4, "f": 5, "g": 6, "h": 7}
-    colsToFiles = {v: k for k, v in filesToCols.items()}
+    cols_to_files = {v: k for k, v in files_to_cols.items()}
 
     def __init__(self, startSq, endSq, board, is_enpassant_move=False, is_castle_move=False):
         self.start_row = startSq[0]
@@ -526,6 +533,7 @@ class Move():
             self.piece_captured = 'wp' if self.piece_moved == 'bp' else 'bp'
         # Roque
         self.is_castle_move = is_castle_move
+        self.is_capture = self.piece_captured != "--"
 
     def __eq__(self, other):
         if isinstance(other, Move):
@@ -533,28 +541,43 @@ class Move():
         return False
 
     def getRankFile(self, r, c):
-        return self.colsToFiles[c] + self.rowsToRanks[r]
+        return self.cols_to_files[c] + self.rows_to_ranks[r]
 
     def getChessNotation(self):
-        output_string = ""
         if self.is_pawn_promotion:
-            output_string += self.getRankFile(self.end_row, self.end_col) + "Q"
+            return self.getRankFile(self.end_row, self.end_col) + "Q"
         if self.is_castle_move:
             if self.end_col == 1:
-                output_string += "0-0-0"
+                return "0-0-0" # Roque long
             else:
-                output_string += "0-0"
+                return "0-0" # Roque
         if self.is_enpassant_move:
-            output_string += self.getRankFile(self.start_row, self.start_col)[0] + "x" + self.getRankFile(self.end_row, self.end_col) + " e.p."
+            return self.getRankFile(self.start_row, self.start_col)[0] + "x" + self.getRankFile(self.end_row, self.end_col) + " e.p."
         if self.piece_captured != "--":
             if self.piece_moved[1] == "p":
-                output_string += self.getRankFile(self.start_row, self.start_col)[0] + "x" + self.getRankFile(self.end_row, self.end_col)
+                return self.getRankFile(self.start_row, self.start_col)[0] + "x" + self.getRankFile(self.end_row,self.end_col)
             else:
-                output_string += self.piece_moved[1] + "x" + self.getRankFile(self.end_row, self.end_col)
+                return self.piece_moved[1] + "x" + self.getRankFile(self.end_row, self.end_col)
         else:
             if self.piece_moved[1] == "p":
-                output_string += self.getRankFile(self.end_row, self.end_col)
+                return self.getRankFile(self.end_row, self.end_col)
             else:
-                output_string += self.piece_moved[1] + self.getRankFile(self.end_row, self.end_col)
+                return self.piece_moved[1] + self.getRankFile(self.end_row, self.end_col)
+        return "error"
 
-        return output_string
+    def __str__(self):
+        if self.is_castle_move:
+            return "0-0" if self.end_col == 6 else "0-0-0"
+
+        end_square = self.getRankFile(self.end_row, self.end_col)
+
+        if self.piece_moved[1] == "p":
+            if self.is_capture:
+                return self.cols_to_files[self.start_col] + "x" + end_square
+            else:
+                return end_square + "Q" if self.is_pawn_promotion else end_square
+
+        move_string = self.piece_moved[1]
+        if self.is_capture:
+            move_string += "x"
+        return move_string + end_square
