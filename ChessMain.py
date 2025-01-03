@@ -57,7 +57,7 @@ def main():
 
     turn = 1
 
-    player_one = True  # Si un humain joue les blancs, alors ceci sera True, sinon False
+    player_one = False  # Si un humain joue les blancs, alors ceci sera True, sinon False
     player_two = False  # Si un humain joue les noirs, alors ceci sera True, sinon False
 
     while running:
@@ -165,7 +165,7 @@ def main():
         if game_state.checkmate:
             game_over = True
             if game_state.white_to_move:
-                drawEndGameText(screen, "Black wins by checkmate")
+                drawEndGameText(screen, "Noir gagne par échec et mat")
                 if not last_move_printed:
                     moves_list[-1] += "+"
                     moves_list.append("result: 0-1")
@@ -174,7 +174,7 @@ def main():
                     last_move_printed = True
                     saveGame(moves_list)
             else:
-                drawEndGameText(screen, "White wins by checkmate")
+                drawEndGameText(screen, "Blanc gagne par échec et mat")
                 if not last_move_printed:
                     moves_list.append(f"\n{turn}. {game_state.move_log[-1].getChessNotation()}++")
                     moves_list.append("result: 1-0")
@@ -184,7 +184,7 @@ def main():
                     saveGame(moves_list)
         elif game_state.stalemate:
             game_over = True
-            drawEndGameText(screen, "Stalemate")
+            drawEndGameText(screen, "Impasse")
             if not last_move_printed:
                 if not game_state.white_to_move:
                     moves_list.append(f"\n{turn}. {game_state.move_log[-1].getChessNotation()}")
