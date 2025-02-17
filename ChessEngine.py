@@ -2,7 +2,6 @@
 Fichier gérant les informations du jeu
 """
 
-
 class GameState():
     def __init__(self):
         # Board is an 8x8 2D List, each element of the list has 2 characters.
@@ -36,9 +35,10 @@ class GameState():
         self.castle_rights_log = [CastleRights(self.current_castling_rights.wks, self.current_castling_rights.bks,
                                                self.current_castling_rights.wqs, self.current_castling_rights.bqs)]
 
-    def makeMove(self, move, is_AI=False):
+    def makeMove(self, move, promotion_callback=None):
         """
-            Fait le mouvement donné en paramètre et l'éxécute (ne vérifie pas si le mouvement est valide)
+            Fait le mouvement donné en paramètre et l'exécute.
+            Pour une promotion de pion, si promotion_callback est fourni, celui-ci permet de choisir la pièce.
         """
         self.board[move.start_row][move.start_col] = "--"
         self.board[move.end_row][move.end_col] = move.piece_moved
@@ -52,12 +52,11 @@ class GameState():
 
         # Promotion du pion
         if move.is_pawn_promotion:
-            # if not is_AI:
-            # promoted_piece = input("Promote to Q, R, B, or N:")  # take this to UI later
-            # while promoted_piece not in ['Q', 'R', 'B', 'N']:
-            #     promoted_piece = input("Invalid Input. Promote to Q, R, B, or N:")
-            # self.board[move.end_row][move.end_col] = move.piece_moved[0] + promoted_piece
-            self.board[move.end_row][move.end_col] = move.piece_moved[0] + 'Q'  # Temporaire
+            if promotion_callback:
+                promoted_piece = promotion_callback()
+            else:
+                promoted_piece = 'Q'
+            self.board[move.end_row][move.end_col] = move.piece_moved[0] + promoted_piece
 
         # En passant
         if move.is_enpassant_move:
@@ -69,23 +68,19 @@ class GameState():
         else:
             self.enpassant_possible = ()
 
-        # Roque
         if move.is_castle_move:
-            if move.end_col - move.start_col == 2:  #
-                self.board[move.end_row][move.end_col - 1] = self.board[move.end_row][
-                    move.end_col + 1]  # Bouge la tour à sa nouvelle case
-                self.board[move.end_row][move.end_col + 1] = '--'  # Efface l'ancienne tour
+            if move.end_col - move.start_col == 2:  # Roque court
+                self.board[move.end_row][move.end_col - 1] = self.board[move.end_row][move.end_col + 1]
+                self.board[move.end_row][move.end_col + 1] = '--'
             else:
-                self.board[move.end_row][move.end_col + 1] = self.board[move.end_row][
-                    move.end_col - 2]  # Bouge la tour à sa nouvelle case
-                self.board[move.end_row][move.end_col - 2] = '--'  # Efface l'ancienne tour
+                self.board[move.end_row][move.end_col + 1] = self.board[move.end_row][move.end_col - 2]
+                self.board[move.end_row][move.end_col - 2] = '--'
 
         self.enpassant_possible_log.append(self.enpassant_possible)
-
-        # Met à jour les droits de roque - chaque fois qu'il s'agit d'un mouvement de tour ou de roi
         self.updateCastleRights(move)
         self.castle_rights_log.append(CastleRights(self.current_castling_rights.wks, self.current_castling_rights.bks,
                                                    self.current_castling_rights.wqs, self.current_castling_rights.bqs))
+
 
     def undoMove(self):
         """
@@ -543,7 +538,6 @@ class GameState():
                     inCheck = True
                     checks.append((endRow, endCol, m[0], m[1]))
         return inCheck, pins, checks
-
 
 class CastleRights():
     def __init__(self, wks, bks, wqs, bqs):
