@@ -383,7 +383,8 @@ def main():
                     row = location[1] // SQ_SIZE
                     if col >= DIMENSION or row >= DIMENSION:
                         continue
-                    if len(player_clicks) == 0:
+                    # Premier clic ou modification de sélection
+                    if not player_clicks:
                         piece = game_state.board[row][col]
                         if piece == "--" or piece[0] != ('w' if game_state.white_to_move else 'b'):
                             square_selected = ()
@@ -393,15 +394,25 @@ def main():
                             square_selected = (row, col)
                             player_clicks.append(square_selected)
                     else:
-                        square_selected = (row, col)
-                        player_clicks.append(square_selected)
+                        # Si le joueur clique sur une case contenant une pièce de son camp, on réinitialise la sélection
+                        piece = game_state.board[row][col]
+                        if piece != "--" and piece[0] == ('w' if game_state.white_to_move else 'b'):
+                            square_selected = (row, col)
+                            player_clicks = [square_selected]
+                            continue  # On attend ensuite le second clic pour la destination
+                        else:
+                            # Sinon, on considère le clic comme la case destination
+                            square_selected = (row, col)
+                            player_clicks.append(square_selected)
                     if len(player_clicks) == 2:
                         move = ChessEngine.Move(player_clicks[0], player_clicks[1], game_state.board)
                         for valid_move in valid_moves:
                             if move == valid_move:
                                 if valid_move.is_pawn_promotion:
                                     promotion_pending_move = valid_move
-                                    promotion_popup = PromotionPopup((BOARD_WIDTH//2-150, BOARD_HEIGHT//2-50), (300, 100), lambda piece: piece)
+                                    promotion_popup = PromotionPopup(
+                                        (BOARD_WIDTH // 2 - 150, BOARD_HEIGHT // 2 - 50), (300, 100),
+                                        lambda piece: piece)
                                 else:
                                     game_state.makeMove(valid_move)
                                     move_made = True
