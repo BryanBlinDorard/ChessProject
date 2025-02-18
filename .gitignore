@@ -1,6 +1,7 @@
 # Perso
 .idea/
 image_processing/
+*.pkl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
