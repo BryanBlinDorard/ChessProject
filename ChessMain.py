@@ -8,6 +8,19 @@ from multiprocessing import Process, Queue
 import ChessEngine, ChessAI
 
 # --------------------------------------------------
+# Constantes d'affichage
+# --------------------------------------------------
+DIMENSION = 8
+BOARD_WIDTH = BOARD_HEIGHT = 512
+MOVE_LOG_PANEL_WIDTH = 250
+MOVE_LOG_PANEL_HEIGHT = BOARD_HEIGHT
+MAX_FPS = 15
+SQ_SIZE = BOARD_HEIGHT // DIMENSION
+
+# Drapeau pour inverser le plateau (True = plateau retourné, i.e. les noirs en bas)
+flip_board = False
+
+# --------------------------------------------------
 # Gestion des ressources
 # --------------------------------------------------
 class ResourceManager:
@@ -122,76 +135,106 @@ class PromotionPopup:
 # --------------------------------------------------
 class Animation:
     @staticmethod
-    def animate_move(move, screen, board, sq_size, clock):
+    def easeOutCubic(t: float) -> float:
+        """Fonction easing pour une interpolation plus fluide (t entre 0 et 1)."""
+        return 1 - pow(1 - t, 3)
+
+    @staticmethod
+    def animate_move(move: ChessEngine.Move, screen: p.Surface, board: list, sq_size: int, clock: p.time.Clock):
         d_row = move.end_row - move.start_row
         d_col = move.end_col - move.start_col
-        frames_per_square = 1
-        frame_count = (abs(d_row) + abs(d_col)) * frames_per_square
+        frames_per_square = 3  # augmente pour une animation plus longue
+        frame_count = int((abs(d_row) + abs(d_col)) * frames_per_square)
         resource_manager = ResourceManager(sq_size)
         for frame in range(frame_count + 1):
-            row = move.start_row + d_row * frame / frame_count
-            col = move.start_col + d_col * frame / frame_count
+            t = frame / frame_count  # t varie de 0 à 1
+            eased_t = Animation.easeOutCubic(t)
+            row = move.start_row + d_row * eased_t
+            col = move.start_col + d_col * eased_t
+            if flip_board:
+                disp_row = DIMENSION - 1 - row
+            else:
+                disp_row = row
             draw_board(screen, sq_size)
             draw_pieces(screen, board, sq_size, resource_manager)
-            # Sur la case d'arrivée, redessine le fond avec la couleur appropriée
-            color = p.Color("white") if (move.end_row + move.end_col) % 2 == 0 else p.Color("gray")
-            # Ici, on utilise les couleurs personnalisées du UIManager
-            color = ui_manager.board_color1 if (move.end_row + move.end_col) % 2 == 0 else ui_manager.board_color2
-            end_square = p.Rect(move.end_col * sq_size, move.end_row * sq_size, sq_size, sq_size)
+            if flip_board:
+                disp_end_row = DIMENSION - 1 - move.end_row
+            else:
+                disp_end_row = move.end_row
+            color = ui_manager.board_color1 if (disp_end_row + move.end_col) % 2 == 0 else ui_manager.board_color2
+            end_square = p.Rect(move.end_col * sq_size, disp_end_row * sq_size, sq_size, sq_size)
             p.draw.rect(screen, color, end_square)
             if move.piece_captured != '--':
                 if move.is_enpassant_move:
                     enpassant_row = move.end_row + 1 if move.piece_captured[0] == 'b' else move.end_row - 1
+                    if flip_board:
+                        enpassant_row = DIMENSION - 1 - enpassant_row
                     end_square = p.Rect(move.end_col * sq_size, enpassant_row * sq_size, sq_size, sq_size)
                 image = resource_manager.get_image(move.piece_captured)
                 screen.blit(image, end_square)
             image = resource_manager.get_image(move.piece_moved)
-            screen.blit(image, p.Rect(col * sq_size, row * sq_size, sq_size, sq_size))
+            if flip_board:
+                disp_current_row = DIMENSION - 1 - row
+            else:
+                disp_current_row = row
+            screen.blit(image, p.Rect(col * sq_size, disp_current_row * sq_size, sq_size, sq_size))
             p.display.flip()
             clock.tick(60)
+
 
 # --------------------------------------------------
 # Fonctions de dessin
 # --------------------------------------------------
 def draw_board(screen, sq_size):
-    DIMENSION = 8
     for row in range(DIMENSION):
+        # Calcul de la ligne d'affichage en fonction du flip
+        display_row = row if not flip_board else DIMENSION - 1 - row
         for col in range(DIMENSION):
-            color = ui_manager.board_color1 if (row+col) % 2 == 0 else ui_manager.board_color2
-            p.draw.rect(screen, color, p.Rect(col * sq_size, row * sq_size, sq_size, sq_size))
+            color = ui_manager.board_color1 if (display_row + col) % 2 == 0 else ui_manager.board_color2
+            p.draw.rect(screen, color, p.Rect(col * sq_size, display_row * sq_size, sq_size, sq_size))
 
 def draw_pieces(screen, board, sq_size, resource_manager):
-    DIMENSION = 8
-    for r in range(DIMENSION):
-        for c in range(DIMENSION):
-            piece = board[r][c]
+    for row in range(DIMENSION):
+        # La ligne affichée dépend du flip
+        display_row = row if not flip_board else DIMENSION - 1 - row
+        for col in range(DIMENSION):
+            piece = board[row][col]
             if piece != "--":
-                screen.blit(resource_manager.get_image(piece), p.Rect(c * sq_size, r * sq_size, sq_size, sq_size))
+                screen.blit(resource_manager.get_image(piece), p.Rect(col * sq_size, display_row * sq_size, sq_size, sq_size))
 
 def highlightSquares(screen, game_state, valid_moves, square_selected, sq_size):
     if game_state.in_check:
         king_row, king_col = game_state.white_king_location if game_state.white_to_move else game_state.black_king_location
+        if flip_board:
+            king_row = DIMENSION - 1 - king_row
         s = p.Surface((sq_size, sq_size))
         s.set_alpha(150)
         s.fill(p.Color('red'))
         screen.blit(s, (king_col * sq_size, king_row * sq_size))
-    if len(game_state.move_log) > 0:
+    if game_state.move_log:
         last_move = game_state.move_log[-1]
+        if flip_board:
+            disp_end_row = DIMENSION - 1 - last_move.end_row
+        else:
+            disp_end_row = last_move.end_row
         s = p.Surface((sq_size, sq_size))
         s.set_alpha(100)
         s.fill(p.Color('green'))
-        screen.blit(s, (last_move.end_col * sq_size, last_move.end_row * sq_size))
-    if square_selected != ():
+        screen.blit(s, (last_move.end_col * sq_size, disp_end_row * sq_size))
+    if square_selected:
         row, col = square_selected
-        if game_state.board[row][col][0] == ('w' if game_state.white_to_move else 'b'):
-            s = p.Surface((sq_size, sq_size))
-            s.set_alpha(100)
-            s.fill(p.Color('blue'))
-            screen.blit(s, (col * sq_size, row * sq_size))
-            s.fill(p.Color('yellow'))
-            for move in valid_moves:
-                if move.start_row == row and move.start_col == col:
-                    screen.blit(s, (move.end_col * sq_size, move.end_row * sq_size))
+        # Pour la sélection, on ne transforme pas car la conversion s'effectue lors de l'interprétation des clics
+        s = p.Surface((sq_size, sq_size))
+        s.set_alpha(100)
+        s.fill(p.Color('blue'))
+        # Convertir la ligne de sélection
+        disp_row = row if not flip_board else DIMENSION - 1 - row
+        screen.blit(s, (col * sq_size, disp_row * sq_size))
+        s.fill(p.Color('yellow'))
+        for move in valid_moves:
+            if move.start_row == row and move.start_col == col:
+                target_row = move.end_row if not flip_board else DIMENSION - 1 - move.end_row
+                screen.blit(s, (move.end_col * sq_size, target_row * sq_size))
 
 def drawEndGameText(screen, text, board_width, board_height):
     font = p.font.SysFont("Helvitica", 32, True, False)
@@ -283,7 +326,6 @@ def open_color_selection(screen, mode):
         p.display.flip()
 
 def customization_menu(screen, ui_manager):
-    # Permet de choisir parmi quelques paires de couleurs prédéfinies pour le plateau
     options = [
         (p.Color("white"), p.Color("gray")),
         (p.Color("beige"), p.Color("saddlebrown")),
@@ -296,7 +338,7 @@ def customization_menu(screen, ui_manager):
     menu_surface = p.Surface(screen.get_size())
     menu_surface.fill(p.Color("white"))
     w, h = screen.get_size()
-    total_height = len(options) * button_height + (len(options)-1) * spacing
+    total_height = len(options) * button_height + (len(options) - 1) * spacing
     start_y = (h - total_height) // 2
     for i, (col1, col2) in enumerate(options):
         pos = ((w - button_width) // 2, start_y + i*(button_height + spacing))
@@ -316,7 +358,7 @@ def customization_menu(screen, ui_manager):
                 for btn in buttons:
                     if btn.rect.collidepoint(e.pos):
                         btn.callback()
-                        return  # Quitte le menu après sélection
+                        return
         screen.blit(menu_surface, (0, 0))
         p.display.flip()
 
@@ -324,17 +366,10 @@ def customization_menu(screen, ui_manager):
 # Fonction principale
 # --------------------------------------------------
 def main():
-    BOARD_WIDTH = BOARD_HEIGHT = 512
-    MOVE_LOG_PANEL_WIDTH = 250
-    MOVE_LOG_PANEL_HEIGHT = BOARD_HEIGHT
-    DIMENSION = 8
-    SQ_SIZE = BOARD_HEIGHT // DIMENSION
-    MAX_FPS = 15
-
+    global flip_board, ui_manager
     p.init()
     screen = p.display.set_mode((BOARD_WIDTH + MOVE_LOG_PANEL_WIDTH, BOARD_HEIGHT), p.RESIZABLE)
     clock = p.time.Clock()
-    global ui_manager
     ui_manager = UIManager(BOARD_WIDTH, BOARD_HEIGHT, MOVE_LOG_PANEL_WIDTH, MOVE_LOG_PANEL_HEIGHT)
     resource_manager = ResourceManager(SQ_SIZE)
     game_state = ChessEngine.GameState()
@@ -352,10 +387,17 @@ def main():
     return_queue = None
     move_log_font = p.font.SysFont("Arial", 14)
 
+    # Choix du mode de jeu
     mode, player_one, player_two = gameModeMenu(screen)
+    # Si en mode PvC et que le joueur humain joue les noirs, on inverse le plateau.
+    if mode == "PvC" and not player_one:
+        flip_board = True
+    else:
+        flip_board = False
 
     # Boucle principale
     while True:
+        # Conversion des clics : si flip_board, convertir la ligne (pour la saisie)
         human_turn = (game_state.white_to_move and player_one) or (not game_state.white_to_move and player_two)
         for e in p.event.get():
             if e.type == p.QUIT:
@@ -363,12 +405,11 @@ def main():
                 sys.exit()
             if e.type == p.MOUSEWHEEL:
                 ui_manager.handle_scroll(e, p.mouse.get_pos())
-            # Si une popup de promotion est active, gérer ses clics en priorité
+            # Si une popup de promotion est active, traiter ses clics en priorité
             if promotion_popup:
                 if e.type == p.MOUSEBUTTONDOWN:
                     for btn in promotion_popup.buttons:
                         if btn.rect.collidepoint(e.pos):
-                            chosen_piece = btn.callback()
                             promotion_callback = lambda: btn.text
                             game_state.makeMove(promotion_pending_move, promotion_callback=promotion_callback)
                             move_made = True
@@ -380,7 +421,11 @@ def main():
                 if not game_over and human_turn:
                     location = p.mouse.get_pos()
                     col = location[0] // SQ_SIZE
-                    row = location[1] // SQ_SIZE
+                    # Conversion de la coordonnée verticale selon flip_board
+                    if flip_board:
+                        row = DIMENSION - 1 - (location[1] // SQ_SIZE)
+                    else:
+                        row = location[1] // SQ_SIZE
                     if col >= DIMENSION or row >= DIMENSION:
                         continue
                     # Premier clic ou modification de sélection
@@ -394,14 +439,13 @@ def main():
                             square_selected = (row, col)
                             player_clicks.append(square_selected)
                     else:
-                        # Si le joueur clique sur une case contenant une pièce de son camp, on réinitialise la sélection
+                        # Si le joueur clique sur une pièce de son camp, on réinitialise la sélection
                         piece = game_state.board[row][col]
                         if piece != "--" and piece[0] == ('w' if game_state.white_to_move else 'b'):
                             square_selected = (row, col)
                             player_clicks = [square_selected]
-                            continue  # On attend ensuite le second clic pour la destination
+                            continue
                         else:
-                            # Sinon, on considère le clic comme la case destination
                             square_selected = (row, col)
                             player_clicks.append(square_selected)
                     if len(player_clicks) == 2:
@@ -410,9 +454,8 @@ def main():
                             if move == valid_move:
                                 if valid_move.is_pawn_promotion:
                                     promotion_pending_move = valid_move
-                                    promotion_popup = PromotionPopup(
-                                        (BOARD_WIDTH // 2 - 150, BOARD_HEIGHT // 2 - 50), (300, 100),
-                                        lambda piece: piece)
+                                    promotion_popup = PromotionPopup((BOARD_WIDTH // 2 - 150, BOARD_HEIGHT // 2 - 50),
+                                                                     (300, 100), lambda piece: piece)
                                 else:
                                     game_state.makeMove(valid_move)
                                     move_made = True
@@ -421,9 +464,9 @@ def main():
                                 break
             if e.type == p.KEYDOWN:
                 if e.key == p.K_z:
-                    if len(game_state.move_log) > 0:
+                    if game_state.move_log:
                         game_state.undoMove()
-                    if len(game_state.move_log) > 0:
+                    if game_state.move_log:
                         game_state.undoMove()
                     move_made = True
                     animate = False
@@ -444,17 +487,14 @@ def main():
                         move_finder_process.terminate()
                         ai_thinking = False
                     move_undone = True
-                # Sauvegarde : touche S
                 if e.key == p.K_s:
                     save_game(game_state)
-                # Chargement : touche L
                 if e.key == p.K_l:
                     try:
                         game_state = load_game()
                         valid_moves = game_state.getValidMoves()
                     except Exception as ex:
                         print("Erreur lors du chargement :", ex)
-                # Personnalisation : touche C
                 if e.key == p.K_c:
                     customization_menu(screen, ui_manager)
 
