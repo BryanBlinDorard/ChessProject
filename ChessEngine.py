@@ -6,15 +6,23 @@ Gestion du plateau, des coups, de l’évaluation et du cache des mouvements.
 from typing import List, Tuple, Optional, Any, Callable, Dict
 import copy
 
+import numpy as np
+
 # Constantes
 DIMENSION: int = 8
 CHECKMATE: int = 1000
 STALEMATE: int = 0
 
+from enum import Enum
+
+class Color(Enum):
+    WHITE = "w"
+    BLACK = "b"
+
 # Évaluations de base
 piece_score: dict[str, int] = {"K": 0, "Q": 9, "R": 5, "B": 3, "N": 3, "p": 1}
 
-knight_scores: List[List[float]] = [
+knight_scores = np.array([
     [0.0, 0.1, 0.2, 0.2, 0.2, 0.2, 0.1, 0.0],
     [0.1, 0.3, 0.5, 0.5, 0.5, 0.5, 0.3, 0.1],
     [0.2, 0.5, 0.6, 0.65, 0.65, 0.6, 0.5, 0.2],
@@ -23,8 +31,9 @@ knight_scores: List[List[float]] = [
     [0.2, 0.55, 0.6, 0.65, 0.65, 0.6, 0.55, 0.2],
     [0.1, 0.3, 0.5, 0.55, 0.55, 0.5, 0.3, 0.1],
     [0.0, 0.1, 0.2, 0.2, 0.2, 0.2, 0.1, 0.0]
-]
-bishop_scores: List[List[float]] = [
+])
+
+bishop_scores = np.array([
     [0.0, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.0],
     [0.2, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.2],
     [0.2, 0.4, 0.5, 0.6, 0.6, 0.5, 0.4, 0.2],
@@ -33,8 +42,9 @@ bishop_scores: List[List[float]] = [
     [0.2, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.2],
     [0.2, 0.5, 0.4, 0.4, 0.4, 0.4, 0.5, 0.2],
     [0.0, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.0]
-]
-rook_scores: List[List[float]] = [
+])
+
+rook_scores = np.array([
     [0.25] * DIMENSION,
     [0.5, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.5],
     [0.0, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.0],
@@ -43,8 +53,9 @@ rook_scores: List[List[float]] = [
     [0.0, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.0],
     [0.0, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.0],
     [0.25, 0.25, 0.25, 0.5, 0.5, 0.25, 0.25, 0.25]
-]
-queen_scores: List[List[float]] = [
+])
+
+queen_scores = np.array([
     [0.0, 0.2, 0.2, 0.3, 0.3, 0.2, 0.2, 0.0],
     [0.2, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.2],
     [0.2, 0.4, 0.5, 0.5, 0.5, 0.5, 0.4, 0.2],
@@ -53,8 +64,9 @@ queen_scores: List[List[float]] = [
     [0.2, 0.5, 0.5, 0.5, 0.5, 0.5, 0.4, 0.2],
     [0.2, 0.4, 0.5, 0.4, 0.4, 0.4, 0.4, 0.2],
     [0.0, 0.2, 0.2, 0.3, 0.3, 0.2, 0.2, 0.0]
-]
-pawn_scores: List[List[float]] = [
+])
+
+pawn_scores = np.array([
     [0.8] * DIMENSION,
     [0.7] * DIMENSION,
     [0.3, 0.3, 0.4, 0.5, 0.5, 0.4, 0.3, 0.3],
@@ -63,8 +75,9 @@ pawn_scores: List[List[float]] = [
     [0.25, 0.15, 0.1, 0.2, 0.2, 0.1, 0.15, 0.25],
     [0.25, 0.3, 0.3, 0.0, 0.0, 0.3, 0.3, 0.25],
     [0.2] * DIMENSION
-]
-piece_position_scores: dict[str, List[List[float]]] = {
+])
+
+piece_position_scores = {
     "wN": knight_scores,
     "bN": knight_scores[::-1],
     "wB": bishop_scores,
@@ -76,7 +89,6 @@ piece_position_scores: dict[str, List[List[float]]] = {
     "wp": pawn_scores,
     "bp": pawn_scores[::-1]
 }
-
 
 def is_valid_index(index: int) -> bool:
     """Vérifier si un index est dans la plage du plateau."""
@@ -349,7 +361,7 @@ class GameState:
                 if self.board[r][c] == "--":
                     continue
                 turn: str = self.board[r][c][0]
-                if (turn == 'w' and self.white_to_move) or (turn == 'b' and not self.white_to_move):
+                if (turn == Color.WHITE.value and self.white_to_move) or (turn == Color.BLACK.value and not self.white_to_move):
                     piece: str = self.board[r][c][1]
                     self.move_functions[piece](r, c, moves)
         return moves
@@ -576,7 +588,7 @@ class GameState:
                     elif endPiece[0] == enemyColor:
                         typ = endPiece[1]
                         if (0 <= j <= 3 and typ == 'R') or (4 <= j <= 7 and typ == 'B') or (
-                            i == 1 and typ == 'p' and ((enemyColor == 'w' and 6 <= j <= 7) or (enemyColor == 'b' and 4 <= j <= 5))
+                            i == 1 and typ == 'p' and ((enemyColor == Color.WHITE.value and 6 <= j <= 7) or (enemyColor == Color.BLACK.value and 4 <= j <= 5))
                         ) or (typ == 'Q') or (i == 1 and typ == 'K'):
                             if possiblePin == ():
                                 inCheck = True
