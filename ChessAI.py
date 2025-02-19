@@ -52,6 +52,7 @@ def negamax(game_state: ChessEngine.GameState, valid_moves: List[ChessEngine.Mov
 def moveOrderingHeuristic(game_state: ChessEngine.GameState, move: ChessEngine.Move) -> int:
     """
     Calcule un score pour ordonner les coups.
+    Si le coup mène à une position déjà vue, on ajoute une pénalité pour éviter les répétitions.
     """
     score: int = 0
     if move.is_capture:
