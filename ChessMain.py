@@ -3,7 +3,7 @@ Fichier Principal, gérant les entrées/sorties, la personnalisation et les sauv
 """
 
 import pygame as p
-import sys, os, pickle
+import sys, os, pickle, logging
 from multiprocessing import Process, Queue
 import ChessEngine, ChessAI
 
@@ -19,6 +19,13 @@ SQ_SIZE = BOARD_HEIGHT // DIMENSION
 
 # Drapeau pour inverser le plateau (True = plateau retourné, i.e. les noirs en bas)
 flip_board = False
+
+# --------------------------------------------------
+# Configuration du logging
+# --------------------------------------------------
+logging.basicConfig(filename="chess_debug.log", level=logging.DEBUG,
+                    format="%(asctime)s - %(levelname)s - %(message)s")
+logging.info("Lancement du jeu d'échecs")
 
 # --------------------------------------------------
 # Gestion des ressources
@@ -39,6 +46,7 @@ class ResourceManager:
             return self.cache[piece]
         path = os.path.join(self.image_path, piece + ".png")
         if not os.path.exists(path):
+            logging.error(f"Image not found: {path}")
             raise FileNotFoundError(f"Image not found: {path}")
         image = p.transform.scale(p.image.load(path), (self.sq_size, self.sq_size))
         self.cache[piece] = image
@@ -249,12 +257,21 @@ def drawEndGameText(screen, text, board_width, board_height):
 # Sauvegarde / Chargement
 # --------------------------------------------------
 def save_game(game_state, filename="saved_game.pkl"):
-    with open(filename, "wb") as f:
-        pickle.dump(game_state, f)
+    try:
+        with open(filename, "wb") as f:
+            pickle.dump(game_state, f)
+        logging.info("Partie sauvegardée avec succès.")
+    except Exception as e:
+        logging.error(f"Erreur lors de la sauvegarde : {e}")
 
 def load_game(filename="saved_game.pkl"):
-    with open(filename, "rb") as f:
-        return pickle.load(f)
+    try:
+        with open(filename, "rb") as f:
+            logging.info("Partie chargée avec succès.")
+            return pickle.load(f)
+    except Exception as e:
+        logging.error(f"Erreur lors du chargement : {e}")
+        raise
 
 # --------------------------------------------------
 # Menus dynamiques de personnalisation
@@ -363,6 +380,29 @@ def customization_menu(screen, ui_manager):
         p.display.flip()
 
 # --------------------------------------------------
+# Initialisation des sons
+# --------------------------------------------------
+p.mixer.init()
+move_sound = None
+capture_sound = None
+gameover_sound = None
+
+try:
+    move_sound = p.mixer.Sound("sounds/move1.wav")
+except Exception as e:
+    logging.warning(f"Erreur chargement son déplacement: {e}")
+
+try:
+    capture_sound = p.mixer.Sound("sounds/capture1.wav")
+except Exception as e:
+    logging.warning(f"Erreur chargement son capture: {e}")
+
+try:
+    gameover_sound = p.mixer.Sound("sounds/gameover.wav")
+except Exception as e:
+    logging.warning(f"Erreur chargement son fin de jeu: {e}")
+
+# --------------------------------------------------
 # Fonction principale
 # --------------------------------------------------
 def main():
@@ -372,8 +412,7 @@ def main():
     clock = p.time.Clock()
     ui_manager = UIManager(BOARD_WIDTH, BOARD_HEIGHT, MOVE_LOG_PANEL_WIDTH, MOVE_LOG_PANEL_HEIGHT)
     resource_manager = ResourceManager(SQ_SIZE)
-    game_state = ChessEngine.GameState()
-    valid_moves = game_state.getValidMoves()
+
     move_made = False
     animate = False
     square_selected = ()
@@ -394,6 +433,9 @@ def main():
         flip_board = True
     else:
         flip_board = False
+
+    game_state = ChessEngine.GameState(flip_board=flip_board)
+    valid_moves = game_state.getValidMoves()
 
     # Boucle principale
     while True:
@@ -459,6 +501,13 @@ def main():
                                 else:
                                     game_state.makeMove(valid_move)
                                     move_made = True
+                                    if valid_move.is_capture:
+                                        if capture_sound:
+                                            capture_sound.play()
+                                    else:
+                                        if move_sound:
+                                            move_sound.play()
+                                    logging.info(f"Coup joué : {valid_move}")
                                 square_selected = ()
                                 player_clicks = []
                                 break
@@ -466,6 +515,7 @@ def main():
                 if e.key == p.K_z:
                     if game_state.move_log:
                         game_state.undoMove()
+                        logging.info("Undo effectué")
                     if game_state.move_log:
                         game_state.undoMove()
                     move_made = True
@@ -486,6 +536,7 @@ def main():
                     if ai_thinking and move_finder_process:
                         move_finder_process.terminate()
                         ai_thinking = False
+                        logging.info("Partie réinitialisée")
                     move_undone = True
                 if e.key == p.K_s:
                     save_game(game_state)
@@ -494,7 +545,7 @@ def main():
                         game_state = load_game()
                         valid_moves = game_state.getValidMoves()
                     except Exception as ex:
-                        print("Erreur lors du chargement :", ex)
+                        logging.error(f"Erreur lors du chargement : {ex}")
                 if e.key == p.K_c:
                     customization_menu(screen, ui_manager)
 
@@ -509,9 +560,16 @@ def main():
                 if ai_move is None:
                     ai_move = ChessAI.findRandomMove(valid_moves)
                 game_state.makeMove(ai_move)
+                if ai_move.is_capture:
+                    if capture_sound:
+                        capture_sound.play()
+                else:
+                    if move_sound:
+                        move_sound.play()
                 move_made = True
                 animate = True
                 ai_thinking = False
+                logging.info(f"Coup joué par l'IA : {ai_move}")
 
         if move_made:
             if animate:
