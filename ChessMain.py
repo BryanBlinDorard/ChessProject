@@ -15,18 +15,20 @@ BOARD_WIDTH = BOARD_HEIGHT = 512
 MOVE_LOG_PANEL_WIDTH = 250
 LEFT_PANEL_WIDTH = 250
 MOVE_LOG_PANEL_HEIGHT = BOARD_HEIGHT
-MAX_FPS = 15
+MAX_FPS = 30
 SQ_SIZE = BOARD_HEIGHT // DIMENSION
 
 # Drapeau pour inverser le plateau (True = plateau retourné, i.e. les noirs en bas)
 flip_board = False
 
-# --------------------------------------------------
-# Configuration du logging
-# --------------------------------------------------
-logging.basicConfig(filename="chess_debug.log", level=logging.DEBUG,
-                    format="%(asctime)s - %(levelname)s - %(message)s")
-logging.info("Lancement du jeu d'échecs")
+
+def _configure_logging() -> None:
+    """Configure le logging fichier. Appelé depuis main() pour éviter les
+    effets de bord à l'import (les tests importent ce module)."""
+    if not logging.getLogger().handlers:
+        logging.basicConfig(filename="chess_debug.log", level=logging.DEBUG,
+                            format="%(asctime)s - %(levelname)s - %(message)s")
+    logging.info("Lancement du jeu d'échecs")
 
 # --------------------------------------------------
 # Gestion des ressources
@@ -63,11 +65,20 @@ class UIManager:
         self.move_log_panel_width = move_log_panel_width
         self.move_log_panel_height = move_log_panel_height
         self.move_log_offset = 0
+        self.max_scroll = 0
         self.SCROLL_SPEED = 20
         # Couleurs par défaut du plateau
         self.board_color1 = p.Color("white")
         self.board_color2 = p.Color("gray")
         # Temps de jeu
+        self.white_time = 0
+        self.black_time = 0
+        self.last_time = p.time.get_ticks()
+        self.is_running = True
+
+    def reset_timer(self):
+        """Remet les pendules à zéro et resynchronise l'horloge de référence.
+        À appeler quand la partie (re)commence, après les menus."""
         self.white_time = 0
         self.black_time = 0
         self.last_time = p.time.get_ticks()
@@ -130,6 +141,11 @@ class UIManager:
             move_texts.append(move_str)
         
         # Zone de défilement pour l'historique des coups
+        line_height = font.get_height() + 2
+        content_height = 5 + len(move_texts) * line_height
+        self.max_scroll = max(0, content_height - self.move_log_panel_height)
+        self.move_log_offset = min(self.move_log_offset, self.max_scroll)
+
         scroll_area = p.Surface((self.move_log_panel_width, self.move_log_panel_height))
         scroll_area.fill(p.Color('black'))
         y = 5 - self.move_log_offset
@@ -143,7 +159,8 @@ class UIManager:
     def handle_scroll(self, event, mouse_pos):
         move_log_rect = p.Rect(self.board_width + LEFT_PANEL_WIDTH, 0, self.move_log_panel_width, self.move_log_panel_height)
         if move_log_rect.collidepoint(mouse_pos):
-            self.move_log_offset = max(0, self.move_log_offset - event.y * self.SCROLL_SPEED)
+            new_offset = self.move_log_offset - event.y * self.SCROLL_SPEED
+            self.move_log_offset = max(0, min(new_offset, self.max_scroll))
 
     def draw_loading_indicator(self, screen):
         font = p.font.SysFont("Arial", 24)
@@ -319,8 +336,9 @@ def highlightSquares(screen, game_state, valid_moves, square_selected, sq_size):
 def drawEndGameText(screen, text, board_width, board_height):
     font = p.font.SysFont("Helvitica", 32, True, False)
     text_object = font.render(text, True, p.Color("gray"))
-    text_location = p.Rect(0, 0, board_width, board_height).move(board_width/2 - text_object.get_width()/2,
-                                                                 board_height/2 - text_object.get_height()/2)
+    text_location = p.Rect(0, 0, board_width, board_height).move(
+        LEFT_PANEL_WIDTH + board_width/2 - text_object.get_width()/2,
+        board_height/2 - text_object.get_height()/2)
     screen.blit(text_object, text_location)
     text_object = font.render(text, True, p.Color('black'))
     screen.blit(text_object, text_location.move(2, 2))
@@ -505,32 +523,36 @@ def show_shortcuts_menu(screen):
 # --------------------------------------------------
 # Initialisation des sons
 # --------------------------------------------------
-p.mixer.init()
 move_sound = None
 capture_sound = None
 gameover_sound = None
 
-try:
-    move_sound = p.mixer.Sound("sounds/move1.wav")
-except Exception as e:
-    logging.warning(f"Erreur chargement son déplacement: {e}")
 
-try:
-    capture_sound = p.mixer.Sound("sounds/capture1.wav")
-except Exception as e:
-    logging.warning(f"Erreur chargement son capture: {e}")
-
-try:
-    gameover_sound = p.mixer.Sound("sounds/gameover.wav")
-except Exception as e:
-    logging.warning(f"Erreur chargement son fin de jeu: {e}")
+def _load_sounds() -> None:
+    """Initialise le mixer et charge les sons. Appelé depuis main() pour éviter
+    d'ouvrir le périphérique audio à l'import (effet de bord pour les tests)."""
+    global move_sound, capture_sound, gameover_sound
+    try:
+        p.mixer.init()
+    except Exception as e:
+        logging.warning(f"Impossible d'initialiser l'audio: {e}")
+        return
+    for name, path in (("move_sound", "sounds/move1.wav"),
+                       ("capture_sound", "sounds/capture1.wav"),
+                       ("gameover_sound", "sounds/gameover.wav")):
+        try:
+            globals()[name] = p.mixer.Sound(path)
+        except Exception as e:
+            logging.warning(f"Erreur chargement son {path}: {e}")
 
 # --------------------------------------------------
 # Fonction principale
 # --------------------------------------------------
 def main():
     global flip_board, ui_manager
+    _configure_logging()
     p.init()
+    _load_sounds()
     screen = p.display.set_mode((BOARD_WIDTH + MOVE_LOG_PANEL_WIDTH + LEFT_PANEL_WIDTH, BOARD_HEIGHT), p.RESIZABLE)
     clock = p.time.Clock()
     ui_manager = UIManager(BOARD_WIDTH, BOARD_HEIGHT, MOVE_LOG_PANEL_WIDTH, MOVE_LOG_PANEL_HEIGHT)
@@ -559,6 +581,8 @@ def main():
 
     game_state = ChessEngine.GameState(flip_board=flip_board)
     valid_moves = game_state.getValidMoves()
+    # Le temps passé dans les menus ne doit pas être imputé aux Blancs.
+    ui_manager.reset_timer()
 
     # Boucle principale
     while True:
@@ -646,8 +670,13 @@ def main():
                     if game_state.move_log:
                         game_state.undoMove()
                         logging.info("Undo effectué")
-                    if game_state.move_log:
-                        game_state.undoMove()
+                    # Contre l'IA seulement : annuler aussi le coup de l'IA pour
+                    # rendre la main au joueur. En PvP/CvC, un seul undo.
+                    if mode == "PvC" and game_state.move_log:
+                        human_now = (game_state.white_to_move and player_one) or \
+                                    (not game_state.white_to_move and player_two)
+                        if not human_now:
+                            game_state.undoMove()
                     move_made = True
                     animate = False
                     game_over = False
@@ -656,17 +685,18 @@ def main():
                         ai_thinking = False
                     move_undone = True
                 if e.key == p.K_r: # Réinitialiser la partie
-                    game_state = ChessEngine.GameState()
+                    game_state = ChessEngine.GameState(flip_board=flip_board)
                     valid_moves = game_state.getValidMoves()
                     square_selected = ()
                     player_clicks = []
                     move_made = False
                     animate = False
                     game_over = False
+                    ui_manager.reset_timer()
                     if ai_thinking and move_finder_process:
                         move_finder_process.terminate()
                         ai_thinking = False
-                        logging.info("Partie réinitialisée")
+                    logging.info("Partie réinitialisée")
                     move_undone = True
                 if e.key == p.K_s: # Sauvegarder la partie
                     save_game(game_state)
@@ -674,6 +704,8 @@ def main():
                     try:
                         game_state = load_game()
                         valid_moves = game_state.getValidMoves()
+                        ui_manager.reset_timer()
+                        game_over = False
                     except Exception as ex:
                         logging.error(f"Erreur lors du chargement : {ex}")
                 if e.key == p.K_c: # Personnaliser les couleurs

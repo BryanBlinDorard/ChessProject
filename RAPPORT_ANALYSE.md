@@ -29,7 +29,35 @@ lecture :
   supprimait à tort un droit de roque (rangée non testée).
 
 Le générateur de coups est désormais **conforme** (perft exact partout).
-Restent ouverts : bugs UI (B10, B13–B16, B20…) et IA (B6, B11, B12) → étapes 2 à 4.
+
+## ✅ État : Étape 2 (partielle) réalisée (2026-09-06)
+
+Nettoyage UI — corrigés :
+- **B10** — `Z` ne fait plus un double `undoMove` qu'en mode contre l'IA, et
+  seulement si le dernier coup était celui de l'IA (test `human_now`). En PvP/CvC,
+  un seul undo.
+- **B13** — `drawEndGameText` centre désormais sur le plateau (décalage
+  `LEFT_PANEL_WIDTH`) et non sous le panneau gauche.
+- **B14** — `R` recrée `GameState(flip_board=flip_board)` (orientation conservée)
+  et remet les pendules à zéro.
+- **B15** — le défilement de l'historique est borné en haut : `UIManager` calcule
+  `max_scroll` à partir de la hauteur réelle du contenu et `handle_scroll` clampe
+  dans `[0, max_scroll]`.
+- **B16** — `UIManager.reset_timer()` resynchronise `last_time` au (re)démarrage de
+  la partie, après les menus : le temps passé dans les menus n'est plus imputé aux
+  Blancs. Appelé aussi sur `R` et sur chargement.
+- **B20 / B21** — `p.mixer.init()` + chargement des sons et `logging.basicConfig`
+  sortis du niveau module vers `_load_sounds()` / `_configure_logging()`, appelés
+  depuis `main()`. Importer `ChessMain` (tests) n'ouvre plus l'audio ni ne crée
+  `chess_debug.log`.
+- **B23** — `MAX_FPS` passé de 15 à 30.
+
+Restent ouverts pour l'étape 2 : suppression du `flip_board` global (→ attribut
+d'un `Renderer`, B22), découpage de `main()` (200 lignes), remplacement de la
+sauvegarde `pickle` par FEN + liste de coups (B17). Ces trois points sont des
+refactors plus lourds, sans couverture de test UI — à faire ensuite.
+
+Restent ouverts : bugs IA (B6, B11, B12) → étapes 3 et 4.
 
 ---
 
@@ -159,11 +187,12 @@ Les objets `Move` deviennent non hachables (impossible de faire `set(moves)`). P
 - [x] B18 / B24 / B25 (trouvés via perft).
 - [x] Perft exact à profondeur 4–5 sur les 6 positions de référence.
 
-### Étape 2 — Nettoyage UI (1–2 j)
-- [ ] B10 (undo PvP), B13 (texte de fin), B14 (reset + flip), B15/B16 (scroll, chrono).
-- [ ] Sortir `mixer.init` + sons + `logging.basicConfig` dans `main()`.
+### Étape 2 — Nettoyage UI (1–2 j) — 🟡 EN COURS
+- [x] B10 (undo PvP), B13 (texte de fin), B14 (reset + flip), B15/B16 (scroll, chrono).
+- [x] Sortir `mixer.init` + sons + `logging.basicConfig` dans `main()`.
+- [x] `MAX_FPS` monté à 30.
 - [ ] Supprimer `flip_board` global → attribut d'une classe `Renderer`.
-- [ ] Découper `main()` ; monter `MAX_FPS` à 30–60.
+- [ ] Découper `main()`.
 - [ ] Remplacer la sauvegarde `pickle` par FEN + liste de coups (PGN léger).
 
 ### Étape 3 — Moteur performant (2–4 j)
