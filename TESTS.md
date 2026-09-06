@@ -23,6 +23,7 @@ pytest -q
 | `test_chess.py` | Tests historiques : en passant, roque, répétition, règle des 50 coups, matériel insuffisant, performance de l'IA. |
 | `test_perft.py` | **Validation de référence du générateur de coups.** Compte les nœuds de l'arbre des coups légaux (perft) sur 6 positions standard (position initiale, Kiwipete, positions 3 à 6 du Chess Programming Wiki) et compare aux valeurs publiées. |
 | `test_rules_regression.py` | Verrouille les bugs de règles corrigés : pat, mat, matériel insuffisant resserré, triple répétition, roque à travers une case tenue par un pion, broches recalculées, sous-promotions, prise en passant exposant le roi. |
+| `test_serialization.py` | Sauvegarde / chargement JSON des parties (`serialization.py`) : génération de FEN, aller-retour position + historique, conservation de l'orientation et du choix de sous-promotion, rejet d'une version inconnue, recalcul des drapeaux de fin de partie au chargement. |
 | `fen_utils.py` | Chargement d'une position FEN + fonctions `perft` / `perft_divide` (utilitaires de test, pas du code de jeu). |
 
 ## Perft profond (lent, ~100 s)

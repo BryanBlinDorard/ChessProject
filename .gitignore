@@ -174,3 +174,7 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+# Sauvegardes de parties et logs runtime
+saved_game.json
+saved_game.pkl
+chess_debug.log

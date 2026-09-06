@@ -52,10 +52,27 @@ Nettoyage UI — corrigés :
   `chess_debug.log`.
 - **B23** — `MAX_FPS` passé de 15 à 30.
 
-Restent ouverts pour l'étape 2 : suppression du `flip_board` global (→ attribut
-d'un `Renderer`, B22), découpage de `main()` (200 lignes), remplacement de la
-sauvegarde `pickle` par FEN + liste de coups (B17). Ces trois points sont des
-refactors plus lourds, sans couverture de test UI — à faire ensuite.
+## ✅ État : Étape 2 terminée (2026-09-06)
+
+Les trois refactors restants de l'étape 2 sont faits :
+- **B22** — la variable globale `flip_board` et le `ui_manager` global disparaissent.
+  Tout le dessin passe par une classe `Renderer` (plateau, pièces, surbrillances,
+  animation, texte de fin) qui porte l'orientation en attribut. Conversions
+  pixel→case centralisées dans `Renderer.square_from_pixel`.
+- **Découpage de `main()`** — la boucle de 200 lignes devient une classe
+  `GameController` (`handle_event` / `update_ai` / `draw` / `run`). `main()` se
+  limite à l'initialisation (pygame, sons, logging), au menu et au lancement du
+  contrôleur.
+- **B17** — la sauvegarde `pickle` est remplacée par `serialization.py` : JSON
+  versionné contenant la FEN de départ + la liste des coups. Le chargement
+  rejoue les coups par le moteur, l'état est donc toujours conforme aux règles
+  courantes (et plus aucun risque d'exécution de code via `pickle`). Couvert par
+  `test_serialization.py` (8 tests). `saved_game.json` remplace `saved_game.pkl`.
+
+Détail : le son est désormais aussi joué sur les promotions ; `R` / `L` remettent
+les pendules à zéro et lèvent l'état de fin de partie.
+
+Suite de tests : **35 tests, tous verts.**
 
 Restent ouverts : bugs IA (B6, B11, B12) → étapes 3 et 4.
 
@@ -187,13 +204,13 @@ Les objets `Move` deviennent non hachables (impossible de faire `set(moves)`). P
 - [x] B18 / B24 / B25 (trouvés via perft).
 - [x] Perft exact à profondeur 4–5 sur les 6 positions de référence.
 
-### Étape 2 — Nettoyage UI (1–2 j) — 🟡 EN COURS
+### Étape 2 — Nettoyage UI (1–2 j) — ✅ FAIT
 - [x] B10 (undo PvP), B13 (texte de fin), B14 (reset + flip), B15/B16 (scroll, chrono).
 - [x] Sortir `mixer.init` + sons + `logging.basicConfig` dans `main()`.
 - [x] `MAX_FPS` monté à 30.
-- [ ] Supprimer `flip_board` global → attribut d'une classe `Renderer`.
-- [ ] Découper `main()`.
-- [ ] Remplacer la sauvegarde `pickle` par FEN + liste de coups (PGN léger).
+- [x] Supprimer `flip_board` global → classe `Renderer`.
+- [x] Découper `main()` → classe `GameController`.
+- [x] Remplacer la sauvegarde `pickle` par FEN + liste de coups (`serialization.py`).
 
 ### Étape 3 — Moteur performant (2–4 j)
 - [ ] Table `attacked[r][c]` calculée une fois par position ; supprimer les appels répétés à `squareUnderAttack`.
