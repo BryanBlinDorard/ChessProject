@@ -714,17 +714,20 @@ class GameController:
     def update_ai(self):
         if self.game_over or self.human_turn() or self.move_undone or self.promotion_popup:
             return
+        # Toujours partir de la liste légale de la position courante (mise en
+        # cache par le moteur), jamais d'une liste potentiellement périmée.
+        valid_moves = self.game_state.getValidMoves()
         if not self.ai_thinking:
             self.ai_thinking = True
             self.return_queue = Queue()
             self.move_finder_process = Process(
                 target=ChessAI.findBestMove,
-                args=(self.game_state, self.valid_moves, self.return_queue))
+                args=(self.game_state, valid_moves, self.return_queue))
             self.move_finder_process.start()
         if self.move_finder_process and not self.move_finder_process.is_alive():
             ai_move = self.return_queue.get()
             if ai_move is None:
-                ai_move = ChessAI.findRandomMove(self.valid_moves)
+                ai_move = ChessAI.findRandomMove(valid_moves)
             self.game_state.makeMove(ai_move)
             _play_move_sound(ai_move)
             self.move_made = True
@@ -761,8 +764,9 @@ class GameController:
             for e in p.event.get():
                 self.handle_event(e)
 
-            self.update_ai()
-
+            # Rafraîchir la liste des coups légaux AVANT de lancer l'IA : sinon
+            # l'IA reçoit la liste du camp précédent (coup humain déjà joué) et
+            # renvoie un coup rejeté par makeMove (« Mouvement non valide »).
             if self.move_made:
                 if self.animate and self.game_state.move_log:
                     self.renderer.animate_move(self.game_state.move_log[-1],
@@ -771,6 +775,8 @@ class GameController:
                 self.move_made = False
                 self.animate = False
                 self.move_undone = False
+
+            self.update_ai()
 
             self.draw()
             self.clock.tick(MAX_FPS)
