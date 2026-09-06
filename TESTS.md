@@ -1,0 +1,42 @@
+# Tests
+
+## Installation
+
+```bash
+python -m pip install -r requirements-dev.txt
+```
+
+## Lancer les tests
+
+```bash
+# Suite complète (rapide, ~5 s)
+python -m unittest discover -p 'test_*.py' -v
+
+# Ou avec pytest
+pytest -q
+```
+
+## Contenu
+
+| Fichier | Rôle |
+|---|---|
+| `test_chess.py` | Tests historiques : en passant, roque, répétition, règle des 50 coups, matériel insuffisant, performance de l'IA. |
+| `test_perft.py` | **Validation de référence du générateur de coups.** Compte les nœuds de l'arbre des coups légaux (perft) sur 6 positions standard (position initiale, Kiwipete, positions 3 à 6 du Chess Programming Wiki) et compare aux valeurs publiées. |
+| `test_rules_regression.py` | Verrouille les bugs de règles corrigés : pat, mat, matériel insuffisant resserré, triple répétition, roque à travers une case tenue par un pion, broches recalculées, sous-promotions, prise en passant exposant le roi. |
+| `fen_utils.py` | Chargement d'une position FEN + fonctions `perft` / `perft_divide` (utilitaires de test, pas du code de jeu). |
+
+## Perft profond (lent, ~100 s)
+
+```bash
+RUN_SLOW_PERFT=1 python -m unittest test_perft -v
+```
+
+Vérifie jusqu'à ~4 millions de nœuds par position (perft(5) sur la position
+initiale, perft(4) sur Kiwipete, etc.). Toutes ces valeurs sont exactes :
+le générateur de coups est conforme.
+
+## Tests différentiels (optionnel)
+
+Avec `python-chess` installé, on peut comparer coup par coup le générateur du
+moteur à un moteur de référence (voir l'historique Git pour le script `_diff.py`
+utilisé pendant la campagne de correction).

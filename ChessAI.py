@@ -24,7 +24,7 @@ def negamax(game_state: ChessEngine.GameState, valid_moves: List[ChessEngine.Mov
     """
     Fonction récursive NegaMax avec élagage alpha‑beta.
     """
-    board_hash: int = get_board_hash(game_state.board, game_state.white_to_move)
+    board_hash = game_state.get_board_hash_str()
     if board_hash in transposition_table and transposition_table[board_hash]['depth'] >= depth:
         return transposition_table[board_hash]['score'], None
     if depth == 0:
